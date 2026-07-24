@@ -1,12 +1,10 @@
 // app.js
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-// --- CONFIGURACIÓN SUPABASE ---
 const SUPABASE_URL = 'https://hxwtajinbdrumqjgzmnt.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Rf57XQKZhl0jJ_aF3LZmRQ_04Yr-ij9';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// --- ESTADO DE LA APLICACIÓN ---
 let currentUser = null;
 let currentStory = null;
 let currentQuestions = [];
@@ -15,7 +13,6 @@ let score = 0;
 let startTime = 0;
 let utterance = null;
 
-// --- ELEMENTOS DEL DOM ---
 const screens = {
     login: document.getElementById('screen-login'),
     dashboard: document.getElementById('screen-dashboard'),
@@ -24,7 +21,6 @@ const screens = {
     results: document.getElementById('screen-results')
 };
 
-// --- NAVEGACIÓN ---
 function showScreen(screenName) {
     Object.keys(screens).forEach(key => {
         const screen = screens[key];
@@ -39,7 +35,6 @@ function showScreen(screenName) {
     }
 }
 
-// --- VERIFICAR SESIÓN LOCAL AL CARGAR ---
 window.addEventListener('DOMContentLoaded', () => {
     const savedUser = localStorage.getItem('lee_conmigo_user_local');
     if (savedUser) {
@@ -52,7 +47,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- LÓGICA DE INICIO (Perfil y Avatar) ---
 const btnStart = document.getElementById('btn-start');
 if (btnStart) {
     btnStart.addEventListener('click', () => {
@@ -77,7 +71,6 @@ if (btnStart) {
         };
 
         localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
-
         updateDashboardUi();
         showScreen('dashboard');
     });
@@ -100,7 +93,6 @@ function updateDashboardUi() {
     renderCustomThemes();
 }
 
-// --- RENDERIZAR CATEGORÍAS GUARDADAS ---
 function renderCustomThemes() {
     const container = document.getElementById('custom-themes-container');
     if (!container) return;
@@ -124,7 +116,6 @@ function renderCustomThemes() {
     });
 }
 
-// --- FILTRO DE SEGURIDAD ---
 function validateThemeSecurity(themeText) {
     const forbiddenWords = [
         'matar', 'asesinar', 'sangre', 'masacre', 'suicidio', 'morir', 'arma de fuego', 'pistola', 'navaja', 'golpear', 'tortura',
@@ -141,17 +132,14 @@ function validateThemeSecurity(themeText) {
     return true;
 }
 
-// --- SELECCIÓN DE TEMAS FIJOS ---
 document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-        // Solo aplicar si no es un botón generado dinámicamente de custom-themes (esos ya tienen su listener)
         if(e.target.closest('#custom-themes-container')) return;
         const theme = e.target.getAttribute('data-theme');
         if(theme) startReadingSession(theme);
     });
 });
 
-// --- SELECCIÓN DE TEMA PERSONALIZADO CON CRÉDITOS DE ESTRELLAS ---
 const customBtn = document.getElementById('btn-custom-theme');
 if (customBtn) {
     customBtn.addEventListener('click', () => {
@@ -197,7 +185,6 @@ if (customBtn) {
     });
 }
 
-// --- INICIAR SESIÓN DE LECTURA ---
 async function startReadingSession(theme) {
     showScreen('reading');
     const spinner = document.getElementById('loading-spinner');
@@ -235,7 +222,6 @@ async function startReadingSession(theme) {
     }
 }
 
-// --- TEXT-TO-SPEECH ---
 const btnReadAloud = document.getElementById('btn-read-aloud');
 if (btnReadAloud) {
     btnReadAloud.addEventListener('click', () => {
@@ -251,7 +237,6 @@ if (btnReadAloud) {
     });
 }
 
-// --- SISTEMA DE PREGUNTAS ---
 const btnToQuestions = document.getElementById('btn-to-questions');
 if (btnToQuestions) {
     btnToQuestions.addEventListener('click', () => {
@@ -344,7 +329,6 @@ function checkAnswer(btn, selected, correct) {
     }, 2000);
 }
 
-// --- RESULTADOS Y SISTEMA DE NIVELES ---
 function finishSession() {
     showScreen('results');
     
@@ -400,4 +384,3 @@ if (btnHome) {
         showScreen('dashboard');
     });
 }
-
