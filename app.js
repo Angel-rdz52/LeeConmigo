@@ -1,12 +1,12 @@
 // app.js
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-// --- CONFIGURACIÓN SUPABASE ---
+// --- CONFIGURACIÓN SUPABASE (Solo para invocar la Edge Function de la IA) ---
 const SUPABASE_URL = 'https://hxwtajinbdrumqjgzmnt.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Rf57XQKZhl0jJ_aF3LZmRQ_04Yr-ij9';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// --- ESTADO DE LA APLICACIÓN ---
+// --- ESTADO DE LA APLICACIÓN (Guardado localmente) ---
 let currentUser = null;
 let currentStory = null;
 let currentQuestions = [];
@@ -33,9 +33,9 @@ function showScreen(screenName) {
     screens[screenName].classList.add('screen-active');
 }
 
-// --- VERIFICAR SESIÓN GUARDADA AL CARGAR ---
+// --- VERIFICAR SESIÓN LOCAL AL CARGAR ---
 window.addEventListener('DOMContentLoaded', () => {
-    const savedUser = localStorage.getItem('lee_conmigo_user');
+    const savedUser = localStorage.getItem('lee_conmigo_user_local');
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
         updateDashboardUi();
@@ -43,42 +43,28 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- LÓGICA DE INICIO Y PERFIL ---
-document.getElementById('btn-start').addEventListener('click', async () => {
+// --- LÓGICA DE INICIO LOCAL (Sin restricciones de edad ni BD) ---
+document.getElementById('btn-start').addEventListener('click', () => {
     const name = document.getElementById('input-name').value.trim();
-    const age = parseInt(document.getElementById('input-age').value);
+    const age = parseInt(document.getElementById('input-age').value) || 10; // Flexible
 
-    if (!name || isNaN(age) || age < 6 || age > 12) {
-        alert("Por favor, ingresa un nombre y una edad entre 6 y 12 años.");
+    if (!name) {
+        alert("Por favor, ingresa un nombre.");
         return;
     }
 
-    // Buscar si el usuario ya existe en Supabase (evita duplicados)
-    const { data: existingUsers, error: selectError } = await supabase
-        .from('profiles')
-        .select('*')
-        .ilike('name', name)
-        .limit(1);
+    // Cargar o inicializar perfil localmente
+    currentUser = {
+        name: name,
+        age: age,
+        current_level: 1,
+        total_stars: 0,
+        success_streak: 0,
+        fail_streak: 0
+    };
 
-    if (existingUsers && existingUsers.length > 0) {
-        currentUser = existingUsers[0];
-    } else {
-        // Crear nuevo perfil solo si no existe
-        const { data: newUser, error: insertError } = await supabase
-            .from('profiles')
-            .insert([{ name, age, current_level: 1, total_stars: 0, success_streak: 0, fail_streak: 0 }])
-            .select()
-            .single();
-        
-        if (insertError) {
-            alert("Error al crear perfil en la base de datos: " + insertError.message);
-            return;
-        }
-        currentUser = newUser;
-    }
-
-    // Guardar en localStorage para persistencia
-    localStorage.setItem('lee_conmigo_user', JSON.stringify(currentUser));
+    // Guardar en el navegador para que nunca lo vuelva a pedir
+    localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
 
     updateDashboardUi();
     showScreen('dashboard');
@@ -181,7 +167,6 @@ function checkAnswer(btn, selected, correct) {
     const feedback = document.getElementById('feedback-message');
     feedback.classList.remove('hidden');
 
-    // Normalizamos texto para evitar fallos por mayúsculas o espacios
     if (selected.trim().toLowerCase() === correct.trim().toLowerCase()) {
         btn.classList.add('correct');
         feedback.innerText = "¡Correcto! 🌟";
@@ -208,19 +193,20 @@ function checkAnswer(btn, selected, correct) {
     }, 2000);
 }
 
-// --- RESULTADOS Y SISTEMA DE NIVELES ---
-async function finishSession() {
+// --- RESULTADOS Y SISTEMA DE NIVELES (Local) ---
+function finishSession() {
     document.getElementById('questions-content').classList.add('hidden');
-    
-    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-    const wordsRead = currentStory ? currentStory.split(' ').length : 50;
     
     let newLevel = currentUser.current_level;
     let newSuccessStreak = currentUser.success_streak || 0;
     let newFailStreak = currentUser.fail_streak || 0;
     let levelMsg = "Sigue practicando, ¡lo estás haciendo genial!";
 
-    if (score >= 4) {
+    // Cálculo dinámico basado en el total real de preguntas que llegaron (3 o 5)
+    const totalQ = currentQuestions.length;
+    const passingMark = totalQ === 3 ? 3 : 4; // Si son 3 preguntas, pasar con 3; si son 5, pasar con 4 o más.
+
+    if (score >= passingMark) {
         newSuccessStreak++;
         newFailStreak = 0;
         if (newSuccessStreak >= 3 && newLevel < 5) {
@@ -228,7 +214,7 @@ async function finishSession() {
             newSuccessStreak = 0;
             levelMsg = "¡Felicidades! ¡Has subido de nivel! 🚀";
         }
-    } else if (score <= 1) { 
+    } else if (score <= 1 && totalQ === 5) { 
         newFailStreak++;
         newSuccessStreak = 0;
         if (newFailStreak >= 2 && newLevel > 1) {
@@ -243,31 +229,17 @@ async function finishSession() {
 
     const newStars = (currentUser.total_stars || 0) + score;
 
-    // Guardar sesión en Supabase
-    await supabase.from('reading_sessions').insert([{
-        profile_id: currentUser.id,
-        words_read: wordsRead,
-        time_spent_seconds: timeSpent,
-        score: score
-    }]);
-
-    // Actualizar perfil en Supabase
-    await supabase.from('profiles').update({
-        current_level: newLevel,
-        total_stars: newStars,
-        success_streak: newSuccessStreak,
-        fail_streak: newFailStreak
-    }).eq('id', currentUser.id);
-
-    // Actualizar estado local y almacenamiento
+    // Actualizar estado local
     currentUser.current_level = newLevel;
     currentUser.total_stars = newStars;
     currentUser.success_streak = newSuccessStreak;
     currentUser.fail_streak = newFailStreak;
-    localStorage.setItem('lee_conmigo_user', JSON.stringify(currentUser));
+    
+    // Guardar cambios persistentes en el navegador
+    localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
 
-    // Mostrar UI de Resultados
-    document.getElementById('result-score').innerText = `${score}/5`;
+    // Mostrar UI de Resultados con el denominador correcto dinámico (ej: 3/3 en lugar de 3/5)
+    document.getElementById('result-score').innerText = `${score}/${totalQ}`;
     document.getElementById('result-level-msg').innerText = levelMsg;
     showScreen('results');
 }
