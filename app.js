@@ -1,12 +1,12 @@
 // app.js
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-// --- CONFIGURACIÓN SUPABASE (Solo para invocar la Edge Function de la IA) ---
+// --- CONFIGURACIÓN SUPABASE ---
 const SUPABASE_URL = 'https://hxwtajinbdrumqjgzmnt.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Rf57XQKZhl0jJ_aF3LZmRQ_04Yr-ij9';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// --- ESTADO DE LA APLICACIÓN (Guardado localmente) ---
+// --- ESTADO DE LA APLICACIÓN ---
 let currentUser = null;
 let currentStory = null;
 let currentQuestions = [];
@@ -43,27 +43,27 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- LÓGICA DE INICIO LOCAL (Sin restricciones de edad ni BD) ---
+// --- LÓGICA DE INICIO (Nombre y Género para Avatar) ---
 document.getElementById('btn-start').addEventListener('click', () => {
     const name = document.getElementById('input-name').value.trim();
-    const age = parseInt(document.getElementById('input-age').value) || 10; // Flexible
+    // Suponiendo que tu select en el HTML tiene el id "input-gender" (opciones: 'hombre' o 'mujer')
+    const genderSelect = document.getElementById('input-gender'); 
+    const gender = genderSelect ? genderSelect.value : 'hombre';
 
     if (!name) {
         alert("Por favor, ingresa un nombre.");
         return;
     }
 
-    // Cargar o inicializar perfil localmente
     currentUser = {
         name: name,
-        age: age,
+        gender: gender, // 'hombre' o 'mujer'
         current_level: 1,
         total_stars: 0,
         success_streak: 0,
         fail_streak: 0
     };
 
-    // Guardar en el navegador para que nunca lo vuelva a pedir
     localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
 
     updateDashboardUi();
@@ -72,7 +72,14 @@ document.getElementById('btn-start').addEventListener('click', () => {
 
 function updateDashboardUi() {
     if (!currentUser) return;
-    document.getElementById('dash-name').innerText = `Hola, ${currentUser.name}`;
+    
+    // Personalizar icono de perfil según el género
+    const avatarIcon = currentUser.gender === 'mujer' ? '👧' : '👦';
+    const dashNameElement = document.getElementById('dash-name');
+    if (dashNameElement) {
+        dashNameElement.innerText = `${avatarIcon} Hola, ${currentUser.name}`;
+    }
+
     document.getElementById('dash-level').innerText = currentUser.current_level;
     document.getElementById('dash-stars').innerText = currentUser.total_stars;
 }
@@ -92,8 +99,9 @@ async function startReadingSession(theme) {
     document.getElementById('questions-content').classList.add('hidden');
 
     try {
+        // Como eliminamos la edad, enviamos un valor estándar o adaptado (ej. 8 años por defecto para guiar a la IA)
         const { data, error } = await supabase.functions.invoke('generate-reading', {
-            body: { age: currentUser.age, level: currentUser.current_level, theme: theme }
+            body: { age: 8, level: currentUser.current_level, theme: theme }
         });
 
         if (error) throw new Error("Error de Supabase: " + JSON.stringify(error));
@@ -193,7 +201,7 @@ function checkAnswer(btn, selected, correct) {
     }, 2000);
 }
 
-// --- RESULTADOS Y SISTEMA DE NIVELES (Local) ---
+// --- RESULTADOS Y SISTEMA DE NIVELES ---
 function finishSession() {
     document.getElementById('questions-content').classList.add('hidden');
     
@@ -202,9 +210,8 @@ function finishSession() {
     let newFailStreak = currentUser.fail_streak || 0;
     let levelMsg = "Sigue practicando, ¡lo estás haciendo genial!";
 
-    // Cálculo dinámico basado en el total real de preguntas que llegaron (3 o 5)
-    const totalQ = currentQuestions.length;
-    const passingMark = totalQ === 3 ? 3 : 4; // Si son 3 preguntas, pasar con 3; si son 5, pasar con 4 o más.
+    const totalQ = currentQuestions.length; // Dinámico: 3 para Nivel 1, 5 para Niveles 2-5
+    const passingMark = totalQ === 3 ? 3 : 4; 
 
     if (score >= passingMark) {
         newSuccessStreak++;
@@ -229,16 +236,13 @@ function finishSession() {
 
     const newStars = (currentUser.total_stars || 0) + score;
 
-    // Actualizar estado local
     currentUser.current_level = newLevel;
     currentUser.total_stars = newStars;
     currentUser.success_streak = newSuccessStreak;
     currentUser.fail_streak = newFailStreak;
     
-    // Guardar cambios persistentes en el navegador
     localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
 
-    // Mostrar UI de Resultados con el denominador correcto dinámico (ej: 3/3 en lugar de 3/5)
     document.getElementById('result-score').innerText = `${score}/${totalQ}`;
     document.getElementById('result-level-msg').innerText = levelMsg;
     showScreen('results');
