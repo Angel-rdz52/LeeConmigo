@@ -68,25 +68,31 @@
 
                 <h3 class="text-md font-bold text-slate-700 mb-3">Elige una categoría:</h3>
                 
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <button class="theme-btn p-4 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-center font-semibold text-emerald-800 transition shadow-sm" data-theme="Animales del bosque">
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <button class="theme-btn p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-center font-semibold text-emerald-800 transition shadow-sm text-sm" data-theme="Animales del bosque">
                         🌲 Animales
                     </button>
-                    <button class="theme-btn p-4 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl text-center font-semibold text-sky-800 transition shadow-sm" data-theme="Aventuras espaciales">
+                    <button class="theme-btn p-3 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl text-center font-semibold text-sky-800 transition shadow-sm text-sm" data-theme="Aventuras espaciales">
                         🚀 Aventura
                     </button>
-                    <button class="theme-btn p-4 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl text-center font-semibold text-purple-800 transition shadow-sm" data-theme="Ciencia y descubrimientos">
+                    <button class="theme-btn p-3 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl text-center font-semibold text-purple-800 transition shadow-sm text-sm" data-theme="Ciencia y descubrimientos">
                         🔬 Ciencia
                     </button>
-                    <button class="theme-btn p-4 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-xl text-center font-semibold text-pink-800 transition shadow-sm" data-theme="Amistad y compañerismo">
+                    <button class="theme-btn p-3 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-xl text-center font-semibold text-pink-800 transition shadow-sm text-sm" data-theme="Amistad y compañerismo">
                         🤝 Amistad
                     </button>
                 </div>
 
+                <div id="custom-themes-container" class="grid grid-cols-2 gap-3 mb-3">
+                    </div>
+
                 <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
-                    <label class="block text-xs font-bold text-slate-600 mb-1">✨ O escribe tu propio tema:</label>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-[11px] font-bold text-slate-600">✨ Crea tu tema (Costo: 5 ⭐):</label>
+                        <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">¡Se guarda!</span>
+                    </div>
                     <div class="flex space-x-2">
-                        <input type="text" id="custom-theme-input" placeholder="Ej. Minecraft, Free Fire..." 
+                        <input type="text" id="custom-theme-input" placeholder="Ej. Minecraft, Mario..." 
                             class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white">
                         <button id="btn-custom-theme" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow transition">
                             Crear 🎮
@@ -95,7 +101,7 @@
                 </div>
             </div>
 
-            <div class="text-center text-xs text-slate-400 mt-3">
+            <div class="text-center text-xs text-slate-400 mt-2">
                 Lee con calma y responde las preguntas al terminar.
             </div>
         </section>
@@ -115,29 +121,29 @@
                 </div>
 
                 <div id="reading-content" class="hidden space-y-4">
-                    <div id="story-text" class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 leading-relaxed text-base">
+                    <div id="story-text" class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 leading-relaxed text-base max-h-[340px] overflow-y-auto">
                         </div>
                 </div>
             </div>
 
-            <div id="reading-footer" class="mt-6">
+            <div id="reading-footer" class="mt-4">
                 <button id="btn-to-questions" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition duration-200">
                     Ya leí el cuento, ir a preguntas ➡️
                 </button>
             </div>
         </section>
 
-        <section id="screen-questions" class="screen-hidden flex-col flex-1 justify-start space-y-4">
+        <section id="screen-questions" class="screen-hidden flex-col flex-1 justify-start space-y-3">
             <div class="flex justify-between items-center">
                 <span id="question-title" class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Pregunta 1 de 3</span>
             </div>
             
-            <h3 id="question-text" class="text-lg font-bold text-slate-800">¿Pregunta de prueba?</h3>
+            <h3 id="question-text" class="text-base font-bold text-slate-800">¿Pregunta de prueba?</h3>
 
-            <div id="options-container" class="space-y-3 w-full">
+            <div id="options-container" class="space-y-2 w-full">
                 </div>
 
-            <div id="feedback-message" class="hidden text-center font-bold text-lg"></div>
+            <div id="feedback-message" class="hidden text-center font-bold text-base"></div>
         </section>
 
         <section id="screen-results" class="screen-hidden flex-col justify-center items-center flex-1 space-y-6 text-center">
@@ -161,3 +167,4 @@
     <script type="module" src="app.js"></script>
 </body>
 </html>
+
