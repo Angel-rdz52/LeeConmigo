@@ -94,20 +94,16 @@ function updateDashboardUi() {
     if (dashStars) dashStars.innerText = currentUser.total_stars;
 }
 
-// --- FILTRO DE SEGURIDAD (Restricción de contenido inapropiado, violento o sexual) ---
+// --- FILTRO DE SEGURIDAD ---
 function validateThemeSecurity(themeText) {
     const forbiddenWords = [
-        // Violencia / Armas explícitas / Sangre
         'matar', 'asesinar', 'sangre', 'masacre', 'suicidio', 'morir', 'arma de fuego', 'pistola', 'navaja', 'golpear', 'tortura',
-        // Contenido Sexual / Adultos
         'sexo', 'sexual', 'pornografia', 'porno', 'desnudo', 'erotico', 'prostituta', 'violacion', 'orgasmo',
-        // Groserías u ofensas graves comunes
         'idiota', 'estupido', 'maldito'
     ];
 
     const lowerTheme = themeText.toLowerCase();
     for (let word of forbiddenWords) {
-        // Validación por coincidencia de palabra completa o parcial
         if (lowerTheme.includes(word)) {
             return false;
         }
@@ -123,7 +119,7 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
     });
 });
 
-// --- SELECCIÓN DE TEMA PERSONALIZADO (Minecraft, Free Fire, etc.) ---
+// --- SELECCIÓN DE TEMA PERSONALIZADO ---
 const customBtn = document.getElementById('btn-custom-theme');
 if (customBtn) {
     customBtn.addEventListener('click', () => {
@@ -137,13 +133,14 @@ if (customBtn) {
             return;
         }
 
-        // Aplicar restricción de seguridad de palabras prohibidas
         if (!validateThemeSecurity(customTheme)) {
-            alert("⚠️ Este tema no está permitido. Por favor elige un tema apto para lectura educativa y divertida (ej. videojuegos, animales, aventuras).");
+            alert("⚠️ Este tema no está permitido. Por favor elige un tema apto para lectura educativa y divertida.");
             return;
         }
 
-        startReadingSession(customTheme);
+        // ADAPTABILIDAD INTELIGENTE: Transformamos el texto libre en una estructura segura para la función de Supabase
+        const adaptedTheme = `Aventura emocionante basada en ${customTheme}`;
+        startReadingSession(adaptedTheme);
     });
 }
 
@@ -164,6 +161,11 @@ async function startReadingSession(theme) {
 
         if (error) throw new Error("Error de Supabase: " + JSON.stringify(error));
         if (data && data.error) throw new Error("Error de la IA: " + data.error);
+
+        // Validar que la IA haya devuelto datos válidos antes de continuar
+        if (!data.texto || !data.preguntas || data.preguntas.length === 0) {
+            throw new Error("La IA no devolvió un cuento o preguntas válidas. Intenta de nuevo.");
+        }
 
         currentStory = data.texto;
         currentQuestions = data.preguntas;
@@ -205,20 +207,24 @@ if (btnToQuestions) {
         if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
         }
+
+        // Verificación de seguridad por si el cuento no cargó bien
+        if (!currentQuestions || currentQuestions.length === 0) {
+            alert("Hubo un error cargando las preguntas de este cuento. Por favor vuelve al inicio.");
+            showScreen('dashboard');
+            return;
+        }
         
-        // 1. Mostrar la pantalla de preguntas explícitamente
         showScreen('questions');
-        
-        // 2. Restablecer contadores
         currentQuestionIndex = 0;
         score = 0;
 
-        // 3. Forzar un pequeño respiro (timeout de 50ms) para asegurar que el DOM dibuje la sección antes de pintar la pregunta
         setTimeout(() => {
             renderQuestion();
         }, 50);
     });
 }
+
 function renderQuestion() {
     if (!currentQuestions || currentQuestionIndex >= currentQuestions.length) {
         finishSession();
@@ -341,3 +347,4 @@ if (btnHome) {
         showScreen('dashboard');
     });
 }
+
