@@ -20,17 +20,23 @@ const screens = {
     login: document.getElementById('screen-login'),
     dashboard: document.getElementById('screen-dashboard'),
     reading: document.getElementById('screen-reading'),
+    questions: document.getElementById('screen-questions'),
     results: document.getElementById('screen-results')
 };
 
 // --- NAVEGACIÓN ---
 function showScreen(screenName) {
-    Object.values(screens).forEach(screen => {
-        screen.classList.remove('screen-active');
-        screen.classList.add('screen-hidden');
+    Object.keys(screens).forEach(key => {
+        const screen = screens[key];
+        if (screen) {
+            screen.classList.remove('screen-active');
+            screen.classList.add('screen-hidden');
+        }
     });
-    screens[screenName].classList.remove('screen-hidden');
-    screens[screenName].classList.add('screen-active');
+    if (screens[screenName]) {
+        screens[screenName].classList.remove('screen-hidden');
+        screens[screenName].classList.add('screen-active');
+    }
 }
 
 // --- VERIFICAR SESIÓN LOCAL AL CARGAR ---
@@ -44,30 +50,34 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- LÓGICA DE INICIO (Perfil y Avatar) ---
-document.getElementById('btn-start').addEventListener('click', () => {
-    const name = document.getElementById('input-name').value.trim();
-    const genderSelect = document.getElementById('input-gender'); 
-    const gender = genderSelect ? genderSelect.value : 'hombre';
+const btnStart = document.getElementById('btn-start');
+if (btnStart) {
+    btnStart.addEventListener('click', () => {
+        const nameInput = document.getElementById('input-name');
+        const name = nameInput ? nameInput.value.trim() : '';
+        const genderSelect = document.getElementById('input-gender'); 
+        const gender = genderSelect ? genderSelect.value : 'hombre';
 
-    if (!name) {
-        alert("Por favor, ingresa un nombre.");
-        return;
-    }
+        if (!name) {
+            alert("Por favor, ingresa un nombre.");
+            return;
+        }
 
-    currentUser = {
-        name: name,
-        gender: gender,
-        current_level: 1,
-        total_stars: 0,
-        success_streak: 0,
-        fail_streak: 0
-    };
+        currentUser = {
+            name: name,
+            gender: gender,
+            current_level: 1,
+            total_stars: 0,
+            success_streak: 0,
+            fail_streak: 0
+        };
 
-    localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
+        localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
 
-    updateDashboardUi();
-    showScreen('dashboard');
-});
+        updateDashboardUi();
+        showScreen('dashboard');
+    });
+}
 
 function updateDashboardUi() {
     if (!currentUser) return;
@@ -78,8 +88,31 @@ function updateDashboardUi() {
         dashNameElement.innerText = `${avatarIcon} Hola, ${currentUser.name}`;
     }
 
-    document.getElementById('dash-level').innerText = currentUser.current_level;
-    document.getElementById('dash-stars').innerText = currentUser.total_stars;
+    const dashLevel = document.getElementById('dash-level');
+    const dashStars = document.getElementById('dash-stars');
+    if (dashLevel) dashLevel.innerText = currentUser.current_level;
+    if (dashStars) dashStars.innerText = currentUser.total_stars;
+}
+
+// --- FILTRO DE SEGURIDAD (Restricción de contenido inapropiado, violento o sexual) ---
+function validateThemeSecurity(themeText) {
+    const forbiddenWords = [
+        // Violencia / Armas explícitas / Sangre
+        'matar', 'asesinar', 'sangre', 'masacre', 'suicidio', 'morir', 'arma de fuego', 'pistola', 'navaja', 'golpear', 'tortura',
+        // Contenido Sexual / Adultos
+        'sexo', 'sexual', 'pornografia', 'porno', 'desnudo', 'erotico', 'prostituta', 'violacion', 'orgasmo',
+        // Groserías u ofensas graves comunes
+        'idiota', 'estupido', 'maldito'
+    ];
+
+    const lowerTheme = themeText.toLowerCase();
+    for (let word of forbiddenWords) {
+        // Validación por coincidencia de palabra completa o parcial
+        if (lowerTheme.includes(word)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // --- SELECCIÓN DE TEMAS FIJOS ---
@@ -91,23 +124,38 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
 });
 
 // --- SELECCIÓN DE TEMA PERSONALIZADO (Minecraft, Free Fire, etc.) ---
-document.getElementById('btn-custom-theme').addEventListener('click', () => {
-    const customInput = document.getElementById('custom-theme-input');
-    const customTheme = customInput.value.trim();
+const customBtn = document.getElementById('btn-custom-theme');
+if (customBtn) {
+    customBtn.addEventListener('click', () => {
+        const customInput = document.getElementById('custom-theme-input');
+        if (!customInput) return;
+        
+        const customTheme = customInput.value.trim();
 
-    if (!customTheme) {
-        alert("Por favor, escribe un tema personalizado (ej. Minecraft, dinosaurios, etc.)");
-        return;
-    }
+        if (!customTheme) {
+            alert("Por favor, escribe un tema personalizado (ej. Minecraft, Free Fire...)");
+            return;
+        }
 
-    startReadingSession(customTheme);
-});
+        // Aplicar restricción de seguridad de palabras prohibidas
+        if (!validateThemeSecurity(customTheme)) {
+            alert("⚠️ Este tema no está permitido. Por favor elige un tema apto para lectura educativa y divertida (ej. videojuegos, animales, aventuras).");
+            return;
+        }
+
+        startReadingSession(customTheme);
+    });
+}
 
 async function startReadingSession(theme) {
     showScreen('reading');
-    document.getElementById('loading-spinner').classList.remove('hidden');
-    document.getElementById('reading-content').classList.add('hidden');
-    document.getElementById('questions-content').classList.add('hidden');
+    const spinner = document.getElementById('loading-spinner');
+    const readingContent = document.getElementById('reading-content');
+    const questionsContent = document.getElementById('questions-content');
+
+    if (spinner) spinner.classList.remove('hidden');
+    if (readingContent) readingContent.classList.add('hidden');
+    if (questionsContent) questionsContent.classList.add('hidden');
 
     try {
         const { data, error } = await supabase.functions.invoke('generate-reading', {
@@ -120,40 +168,47 @@ async function startReadingSession(theme) {
         currentStory = data.texto;
         currentQuestions = data.preguntas;
         
-        document.getElementById('story-text').innerText = currentStory;
-        document.getElementById('loading-spinner').classList.add('hidden');
-        document.getElementById('reading-content').classList.remove('hidden');
+        const storyText = document.getElementById('story-text');
+        if (storyText) storyText.innerText = currentStory;
+        
+        if (spinner) spinner.classList.add('hidden');
+        if (readingContent) readingContent.classList.remove('hidden');
         startTime = Date.now();
 
     } catch (err) {
-        document.getElementById('loading-spinner').classList.add('hidden');
+        if (spinner) spinner.classList.add('hidden');
         alert("DIAGNÓSTICO:\n\n" + err.message);
         showScreen('dashboard');
     }
 }
 
 // --- TEXT-TO-SPEECH ---
-document.getElementById('btn-read-aloud').addEventListener('click', () => {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        utterance = new SpeechSynthesisUtterance(currentStory);
-        utterance.lang = 'es-ES';
-        utterance.rate = 0.9;
-        window.speechSynthesis.speak(utterance);
-    } else {
-        alert("Tu navegador no soporta lectura en voz alta.");
-    }
-});
+const btnReadAloud = document.getElementById('btn-read-aloud');
+if (btnReadAloud) {
+    btnReadAloud.addEventListener('click', () => {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            utterance = new SpeechSynthesisUtterance(currentStory);
+            utterance.lang = 'es-ES';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        } else {
+            alert("Tu navegador no soporta lectura en voz alta.");
+        }
+    });
+}
 
 // --- SISTEMA DE PREGUNTAS ---
-document.getElementById('btn-to-questions').addEventListener('click', () => {
-    if(window.speechSynthesis) window.speechSynthesis.cancel();
-    document.getElementById('reading-content').classList.add('hidden');
-    document.getElementById('questions-content').classList.remove('hidden');
-    currentQuestionIndex = 0;
-    score = 0;
-    renderQuestion();
-});
+const btnToQuestions = document.getElementById('btn-to-questions');
+if (btnToQuestions) {
+    btnToQuestions.addEventListener('click', () => {
+        if(window.speechSynthesis) window.speechSynthesis.cancel();
+        showScreen('questions');
+        currentQuestionIndex = 0;
+        score = 0;
+        renderQuestion();
+    });
+}
 
 function renderQuestion() {
     if (!currentQuestions || currentQuestionIndex >= currentQuestions.length) {
@@ -162,12 +217,18 @@ function renderQuestion() {
     }
 
     const q = currentQuestions[currentQuestionIndex];
-    document.getElementById('question-title').innerText = `Pregunta ${currentQuestionIndex + 1} de ${currentQuestions.length}`;
-    document.getElementById('question-text').innerText = q.pregunta;
+    const qTitle = document.getElementById('question-title');
+    const qText = document.getElementById('question-text');
+
+    if (qTitle) qTitle.innerText = `Pregunta ${currentQuestionIndex + 1} de ${currentQuestions.length}`;
+    if (qText) qText.innerText = q.pregunta;
     
     const container = document.getElementById('options-container');
+    if (!container) return;
+    
     container.innerHTML = '';
-    document.getElementById('feedback-message').classList.add('hidden');
+    const feedback = document.getElementById('feedback-message');
+    if (feedback) feedback.classList.add('hidden');
 
     q.opciones.forEach(opcion => {
         const btn = document.createElement('button');
@@ -183,12 +244,14 @@ function checkAnswer(btn, selected, correct) {
     buttons.forEach(b => b.disabled = true);
 
     const feedback = document.getElementById('feedback-message');
-    feedback.classList.remove('hidden');
+    if (feedback) feedback.classList.remove('hidden');
 
     if (selected.trim().toLowerCase() === correct.trim().toLowerCase()) {
         btn.classList.add('correct');
-        feedback.innerText = "¡Correcto! 🌟";
-        feedback.className = "mt-4 text-xl font-bold text-center text-green-500";
+        if (feedback) {
+            feedback.innerText = "¡Correcto! 🌟";
+            feedback.className = "mt-4 text-xl font-bold text-center text-green-500";
+        }
         score++;
     } else {
         btn.classList.add('incorrect');
@@ -197,8 +260,10 @@ function checkAnswer(btn, selected, correct) {
                 b.classList.add('correct'); 
             }
         });
-        feedback.innerText = `Casi... la respuesta correcta era: "${correct}"`;
-        feedback.className = "mt-4 text-xl font-bold text-center text-red-500";
+        if (feedback) {
+            feedback.innerText = `Casi... la respuesta correcta era: "${correct}"`;
+            feedback.className = "mt-4 text-xl font-bold text-center text-red-500";
+        }
     }
 
     setTimeout(() => {
@@ -213,7 +278,7 @@ function checkAnswer(btn, selected, correct) {
 
 // --- RESULTADOS Y SISTEMA DE NIVELES ---
 function finishSession() {
-    document.getElementById('questions-content').classList.add('hidden');
+    showScreen('results');
     
     let newLevel = currentUser.current_level;
     let newSuccessStreak = currentUser.success_streak || 0;
@@ -253,13 +318,17 @@ function finishSession() {
     
     localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
 
-    document.getElementById('result-score').innerText = `${score}/${totalQ}`;
-    document.getElementById('result-level-msg').innerText = levelMsg;
-    showScreen('results');
+    const resultScore = document.getElementById('result-score');
+    const resultLevelMsg = document.getElementById('result-level-msg');
+
+    if (resultScore) resultScore.innerText = `${score}/${totalQ}`;
+    if (resultLevelMsg) resultLevelMsg.innerText = levelMsg;
 }
 
-document.getElementById('btn-home').addEventListener('click', () => {
-    updateDashboardUi();
-    showScreen('dashboard');
-});
-
+const btnHome = document.getElementById('btn-home');
+if (btnHome) {
+    btnHome.addEventListener('click', () => {
+        updateDashboardUi();
+        showScreen('dashboard');
+    });
+}
