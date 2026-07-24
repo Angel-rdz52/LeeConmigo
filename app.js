@@ -44,6 +44,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const savedUser = localStorage.getItem('lee_conmigo_user_local');
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
+        if (!currentUser.saved_themes) {
+            currentUser.saved_themes = [];
+        }
         updateDashboardUi();
         showScreen('dashboard');
     }
@@ -69,7 +72,8 @@ if (btnStart) {
             current_level: 1,
             total_stars: 0,
             success_streak: 0,
-            fail_streak: 0
+            fail_streak: 0,
+            saved_themes: []
         };
 
         localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
@@ -92,6 +96,32 @@ function updateDashboardUi() {
     const dashStars = document.getElementById('dash-stars');
     if (dashLevel) dashLevel.innerText = currentUser.current_level;
     if (dashStars) dashStars.innerText = currentUser.total_stars;
+
+    renderCustomThemes();
+}
+
+// --- RENDERIZAR CATEGORÍAS GUARDADAS ---
+function renderCustomThemes() {
+    const container = document.getElementById('custom-themes-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!currentUser.saved_themes) {
+        currentUser.saved_themes = [];
+    }
+
+    currentUser.saved_themes.forEach(themeName => {
+        const btn = document.createElement('button');
+        btn.className = 'theme-btn p-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-center font-semibold text-indigo-800 transition shadow-sm text-sm truncate';
+        btn.setAttribute('data-theme', themeName);
+        btn.innerText = `🎮 ${themeName}`;
+        
+        btn.addEventListener('click', () => {
+            startReadingSession(`Aventura emocionante basada en ${themeName}`);
+        });
+
+        container.appendChild(btn);
+    });
 }
 
 // --- FILTRO DE SEGURIDAD ---
@@ -113,13 +143,15 @@ function validateThemeSecurity(themeText) {
 
 // --- SELECCIÓN DE TEMAS FIJOS ---
 document.querySelectorAll('.theme-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
+    btn.addEventListener('click', (e) => {
+        // Solo aplicar si no es un botón generado dinámicamente de custom-themes (esos ya tienen su listener)
+        if(e.target.closest('#custom-themes-container')) return;
         const theme = e.target.getAttribute('data-theme');
-        startReadingSession(theme);
+        if(theme) startReadingSession(theme);
     });
 });
 
-// --- SELECCIÓN DE TEMA PERSONALIZADO ---
+// --- SELECCIÓN DE TEMA PERSONALIZADO CON CRÉDITOS DE ESTRELLAS ---
 const customBtn = document.getElementById('btn-custom-theme');
 if (customBtn) {
     customBtn.addEventListener('click', () => {
@@ -129,7 +161,7 @@ if (customBtn) {
         const customTheme = customInput.value.trim();
 
         if (!customTheme) {
-            alert("Por favor, escribe un tema personalizado (ej. Minecraft, Free Fire...)");
+            alert("Por favor, escribe un tema personalizado (ej. Minecraft, Mario Bros...)");
             return;
         }
 
@@ -138,21 +170,41 @@ if (customBtn) {
             return;
         }
 
-        // ADAPTABILIDAD INTELIGENTE: Transformamos el texto libre en una estructura segura para la función de Supabase
+        if (!currentUser.saved_themes) {
+            currentUser.saved_themes = [];
+        }
+
+        const alreadyExists = currentUser.saved_themes.map(t => t.toLowerCase()).includes(customTheme.toLowerCase());
+        const COSTO_ESTRELLAS = 5;
+
+        if (!alreadyExists) {
+            if ((currentUser.total_stars || 0) < COSTO_ESTRELLAS) {
+                alert(`⭐ ¡Te faltan estrellas! Crear y guardar una nueva categoría cuesta ${COSTO_ESTRELLAS} estrellas. ¡Lee más cuentos para conseguirlas!`);
+                return;
+            }
+
+            currentUser.total_stars -= COSTO_ESTRELLAS;
+            currentUser.saved_themes.push(customTheme);
+            
+            localStorage.setItem('lee_conmigo_user_local', JSON.stringify(currentUser));
+            updateDashboardUi();
+            alert(`🎉 ¡Categoría "${customTheme}" guardada con éxito por ${COSTO_ESTRELLAS} estrellas!`);
+        }
+
+        customInput.value = '';
         const adaptedTheme = `Aventura emocionante basada en ${customTheme}`;
         startReadingSession(adaptedTheme);
     });
 }
 
+// --- INICIAR SESIÓN DE LECTURA ---
 async function startReadingSession(theme) {
     showScreen('reading');
     const spinner = document.getElementById('loading-spinner');
     const readingContent = document.getElementById('reading-content');
-    const questionsContent = document.getElementById('questions-content');
 
     if (spinner) spinner.classList.remove('hidden');
     if (readingContent) readingContent.classList.add('hidden');
-    if (questionsContent) questionsContent.classList.add('hidden');
 
     try {
         const { data, error } = await supabase.functions.invoke('generate-reading', {
@@ -162,7 +214,6 @@ async function startReadingSession(theme) {
         if (error) throw new Error("Error de Supabase: " + JSON.stringify(error));
         if (data && data.error) throw new Error("Error de la IA: " + data.error);
 
-        // Validar que la IA haya devuelto datos válidos antes de continuar
         if (!data.texto || !data.preguntas || data.preguntas.length === 0) {
             throw new Error("La IA no devolvió un cuento o preguntas válidas. Intenta de nuevo.");
         }
@@ -208,7 +259,6 @@ if (btnToQuestions) {
             window.speechSynthesis.cancel();
         }
 
-        // Verificación de seguridad por si el cuento no cargó bien
         if (!currentQuestions || currentQuestions.length === 0) {
             alert("Hubo un error cargando las preguntas de este cuento. Por favor vuelve al inicio.");
             showScreen('dashboard');
@@ -243,11 +293,14 @@ function renderQuestion() {
     
     container.innerHTML = '';
     const feedback = document.getElementById('feedback-message');
-    if (feedback) feedback.classList.add('hidden');
+    if (feedback) {
+        feedback.classList.add('hidden');
+        feedback.innerText = '';
+    }
 
     q.opciones.forEach(opcion => {
         const btn = document.createElement('button');
-        btn.className = 'option-btn w-full p-3 text-left border border-slate-200 rounded-xl font-medium hover:bg-slate-50 transition';
+        btn.className = 'option-btn w-full p-3 text-left border border-slate-200 rounded-xl font-medium hover:bg-slate-50 transition text-sm';
         btn.innerText = opcion;
         btn.onclick = () => checkAnswer(btn, opcion, q.respuesta_correcta);
         container.appendChild(btn);
@@ -265,7 +318,7 @@ function checkAnswer(btn, selected, correct) {
         btn.classList.add('correct');
         if (feedback) {
             feedback.innerText = "¡Correcto! 🌟";
-            feedback.className = "mt-4 text-xl font-bold text-center text-green-500";
+            feedback.className = "mt-3 text-lg font-bold text-center text-green-500";
         }
         score++;
     } else {
@@ -276,8 +329,8 @@ function checkAnswer(btn, selected, correct) {
             }
         });
         if (feedback) {
-            feedback.innerText = `Casi... la respuesta correcta era: "${correct}"`;
-            feedback.className = "mt-4 text-xl font-bold text-center text-red-500";
+            feedback.innerText = `Casi... era: "${correct}"`;
+            feedback.className = "mt-3 text-base font-bold text-center text-red-500";
         }
     }
 
