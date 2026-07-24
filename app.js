@@ -202,14 +202,23 @@ if (btnReadAloud) {
 const btnToQuestions = document.getElementById('btn-to-questions');
 if (btnToQuestions) {
     btnToQuestions.addEventListener('click', () => {
-        if(window.speechSynthesis) window.speechSynthesis.cancel();
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+        
+        // 1. Mostrar la pantalla de preguntas explícitamente
         showScreen('questions');
+        
+        // 2. Restablecer contadores
         currentQuestionIndex = 0;
         score = 0;
-        renderQuestion();
+
+        // 3. Forzar un pequeño respiro (timeout de 50ms) para asegurar que el DOM dibuje la sección antes de pintar la pregunta
+        setTimeout(() => {
+            renderQuestion();
+        }, 50);
     });
 }
-
 function renderQuestion() {
     if (!currentQuestions || currentQuestionIndex >= currentQuestions.length) {
         finishSession();
