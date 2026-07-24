@@ -43,10 +43,9 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- LÓGICA DE INICIO (Nombre y Género para Avatar) ---
+// --- LÓGICA DE INICIO (Perfil y Avatar) ---
 document.getElementById('btn-start').addEventListener('click', () => {
     const name = document.getElementById('input-name').value.trim();
-    // Suponiendo que tu select en el HTML tiene el id "input-gender" (opciones: 'hombre' o 'mujer')
     const genderSelect = document.getElementById('input-gender'); 
     const gender = genderSelect ? genderSelect.value : 'hombre';
 
@@ -57,7 +56,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
 
     currentUser = {
         name: name,
-        gender: gender, // 'hombre' o 'mujer'
+        gender: gender,
         current_level: 1,
         total_stars: 0,
         success_streak: 0,
@@ -73,7 +72,6 @@ document.getElementById('btn-start').addEventListener('click', () => {
 function updateDashboardUi() {
     if (!currentUser) return;
     
-    // Personalizar icono de perfil según el género
     const avatarIcon = currentUser.gender === 'mujer' ? '👧' : '👦';
     const dashNameElement = document.getElementById('dash-name');
     if (dashNameElement) {
@@ -84,12 +82,25 @@ function updateDashboardUi() {
     document.getElementById('dash-stars').innerText = currentUser.total_stars;
 }
 
-// --- GENERADOR CON IA (GROQ) ---
+// --- SELECCIÓN DE TEMAS FIJOS ---
 document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
         const theme = e.target.getAttribute('data-theme');
         startReadingSession(theme);
     });
+});
+
+// --- SELECCIÓN DE TEMA PERSONALIZADO (Minecraft, Free Fire, etc.) ---
+document.getElementById('btn-custom-theme').addEventListener('click', () => {
+    const customInput = document.getElementById('custom-theme-input');
+    const customTheme = customInput.value.trim();
+
+    if (!customTheme) {
+        alert("Por favor, escribe un tema personalizado (ej. Minecraft, dinosaurios, etc.)");
+        return;
+    }
+
+    startReadingSession(customTheme);
 });
 
 async function startReadingSession(theme) {
@@ -99,7 +110,6 @@ async function startReadingSession(theme) {
     document.getElementById('questions-content').classList.add('hidden');
 
     try {
-        // Como eliminamos la edad, enviamos un valor estándar o adaptado (ej. 8 años por defecto para guiar a la IA)
         const { data, error } = await supabase.functions.invoke('generate-reading', {
             body: { age: 8, level: currentUser.current_level, theme: theme }
         });
@@ -161,7 +171,7 @@ function renderQuestion() {
 
     q.opciones.forEach(opcion => {
         const btn = document.createElement('button');
-        btn.className = 'option-btn';
+        btn.className = 'option-btn w-full p-3 text-left border border-slate-200 rounded-xl font-medium hover:bg-slate-50 transition';
         btn.innerText = opcion;
         btn.onclick = () => checkAnswer(btn, opcion, q.respuesta_correcta);
         container.appendChild(btn);
@@ -178,7 +188,7 @@ function checkAnswer(btn, selected, correct) {
     if (selected.trim().toLowerCase() === correct.trim().toLowerCase()) {
         btn.classList.add('correct');
         feedback.innerText = "¡Correcto! 🌟";
-        feedback.className = "mt-6 text-2xl font-bold text-center text-green-500";
+        feedback.className = "mt-4 text-xl font-bold text-center text-green-500";
         score++;
     } else {
         btn.classList.add('incorrect');
@@ -188,7 +198,7 @@ function checkAnswer(btn, selected, correct) {
             }
         });
         feedback.innerText = `Casi... la respuesta correcta era: "${correct}"`;
-        feedback.className = "mt-6 text-2xl font-bold text-center text-red-500";
+        feedback.className = "mt-4 text-xl font-bold text-center text-red-500";
     }
 
     setTimeout(() => {
@@ -210,7 +220,7 @@ function finishSession() {
     let newFailStreak = currentUser.fail_streak || 0;
     let levelMsg = "Sigue practicando, ¡lo estás haciendo genial!";
 
-    const totalQ = currentQuestions.length; // Dinámico: 3 para Nivel 1, 5 para Niveles 2-5
+    const totalQ = currentQuestions.length; 
     const passingMark = totalQ === 3 ? 3 : 4; 
 
     if (score >= passingMark) {
@@ -252,3 +262,4 @@ document.getElementById('btn-home').addEventListener('click', () => {
     updateDashboardUi();
     showScreen('dashboard');
 });
+
