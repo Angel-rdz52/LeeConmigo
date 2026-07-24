@@ -2,9 +2,8 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
 // --- CONFIGURACIÓN SUPABASE ---
-// Reemplaza con los valores de tu panel de Supabase (Settings -> API)
-const SUPABASE_URL = 'https://TU_PROYECTO.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbG...TU_ANON_KEY_PUBLICA';
+const SUPABASE_URL = 'https://hxwtajinbdrumqjgzmnt.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Rf57XQKZhl0jJ_aF3LZmRQ_04Yr-ij9';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- ESTADO DE LA APLICACIÓN ---
@@ -14,7 +13,7 @@ let currentQuestions = [];
 let currentQuestionIndex = 0;
 let score = 0;
 let startTime = 0;
-let utterance = null; // Para Web Speech API
+let utterance = null;
 
 // --- ELEMENTOS DEL DOM ---
 const screens = {
@@ -34,6 +33,16 @@ function showScreen(screenName) {
     screens[screenName].classList.add('screen-active');
 }
 
+// --- VERIFICAR SESIÓN GUARDADA AL CARGAR ---
+window.addEventListener('DOMContentLoaded', () => {
+    const savedUser = localStorage.getItem('lee_conmigo_user');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        updateDashboardUi();
+        showScreen('dashboard');
+    }
+});
+
 // --- LÓGICA DE INICIO Y PERFIL ---
 document.getElementById('btn-start').addEventListener('click', async () => {
     const name = document.getElementById('input-name').value.trim();
@@ -44,37 +53,45 @@ document.getElementById('btn-start').addEventListener('click', async () => {
         return;
     }
 
-    // Buscar si el usuario ya existe (simplificado por nombre, en prod usar auth)
+    // Buscar si el usuario ya existe en Supabase (evita duplicados)
     const { data: existingUsers, error: selectError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('name', name)
+        .ilike('name', name)
         .limit(1);
 
     if (existingUsers && existingUsers.length > 0) {
         currentUser = existingUsers[0];
     } else {
-        // Crear nuevo perfil
+        // Crear nuevo perfil solo si no existe
         const { data: newUser, error: insertError } = await supabase
             .from('profiles')
-            .insert([{ name, age }])
+            .insert([{ name, age, current_level: 1, total_stars: 0, success_streak: 0, fail_streak: 0 }])
             .select()
             .single();
         
+        if (insertError) {
+            alert("Error al crear perfil en la base de datos: " + insertError.message);
+            return;
+        }
         currentUser = newUser;
     }
+
+    // Guardar en localStorage para persistencia
+    localStorage.setItem('lee_conmigo_user', JSON.stringify(currentUser));
 
     updateDashboardUi();
     showScreen('dashboard');
 });
 
 function updateDashboardUi() {
+    if (!currentUser) return;
     document.getElementById('dash-name').innerText = `Hola, ${currentUser.name}`;
     document.getElementById('dash-level').innerText = currentUser.current_level;
     document.getElementById('dash-stars').innerText = currentUser.total_stars;
 }
 
-// --- GENERADOR CON IA ---
+// --- GENERADOR CON IA (GROQ) ---
 document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
         const theme = e.target.getAttribute('data-theme');
@@ -89,12 +106,12 @@ async function startReadingSession(theme) {
     document.getElementById('questions-content').classList.add('hidden');
 
     try {
-        // Llama a la Edge Function
         const { data, error } = await supabase.functions.invoke('generate-reading', {
             body: { age: currentUser.age, level: currentUser.current_level, theme: theme }
         });
 
-        if (error) throw error;
+        if (error) throw new Error("Error de Supabase: " + JSON.stringify(error));
+        if (data && data.error) throw new Error("Error de la IA: " + data.error);
 
         currentStory = data.texto;
         currentQuestions = data.preguntas;
@@ -105,7 +122,8 @@ async function startReadingSession(theme) {
         startTime = Date.now();
 
     } catch (err) {
-        alert("Hubo un error mágico preparando tu cuento. ¡Intenta de nuevo!");
+        document.getElementById('loading-spinner').classList.add('hidden');
+        alert("DIAGNÓSTICO:\n\n" + err.message);
         showScreen('dashboard');
     }
 }
@@ -113,10 +131,10 @@ async function startReadingSession(theme) {
 // --- TEXT-TO-SPEECH ---
 document.getElementById('btn-read-aloud').addEventListener('click', () => {
     if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel(); // Detener lecturas anteriores
+        window.speechSynthesis.cancel();
         utterance = new SpeechSynthesisUtterance(currentStory);
         utterance.lang = 'es-ES';
-        utterance.rate = 0.9; // Velocidad para niños
+        utterance.rate = 0.9;
         window.speechSynthesis.speak(utterance);
     } else {
         alert("Tu navegador no soporta lectura en voz alta.");
@@ -134,6 +152,11 @@ document.getElementById('btn-to-questions').addEventListener('click', () => {
 });
 
 function renderQuestion() {
+    if (!currentQuestions || currentQuestionIndex >= currentQuestions.length) {
+        finishSession();
+        return;
+    }
+
     const q = currentQuestions[currentQuestionIndex];
     document.getElementById('question-title').innerText = `Pregunta ${currentQuestionIndex + 1} de ${currentQuestions.length}`;
     document.getElementById('question-text').innerText = q.pregunta;
@@ -152,22 +175,25 @@ function renderQuestion() {
 }
 
 function checkAnswer(btn, selected, correct) {
-    // Deshabilitar todos los botones
     const buttons = document.querySelectorAll('.option-btn');
     buttons.forEach(b => b.disabled = true);
 
     const feedback = document.getElementById('feedback-message');
     feedback.classList.remove('hidden');
 
-    if (selected === correct) {
+    // Normalizamos texto para evitar fallos por mayúsculas o espacios
+    if (selected.trim().toLowerCase() === correct.trim().toLowerCase()) {
         btn.classList.add('correct');
         feedback.innerText = "¡Correcto! 🌟";
         feedback.className = "mt-6 text-2xl font-bold text-center text-green-500";
         score++;
     } else {
         btn.classList.add('incorrect');
-        // Resaltar la correcta
-        buttons.forEach(b => { if(b.innerText === correct) b.classList.add('correct'); });
+        buttons.forEach(b => { 
+            if(b.innerText.trim().toLowerCase() === correct.trim().toLowerCase()) {
+                b.classList.add('correct'); 
+            }
+        });
         feedback.innerText = `Casi... la respuesta correcta era: "${correct}"`;
         feedback.className = "mt-6 text-2xl font-bold text-center text-red-500";
     }
@@ -179,18 +205,19 @@ function checkAnswer(btn, selected, correct) {
         } else {
             finishSession();
         }
-    }, 2500);
+    }, 2000);
 }
 
 // --- RESULTADOS Y SISTEMA DE NIVELES ---
 async function finishSession() {
-    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-    const wordsRead = currentStory.split(' ').length;
+    document.getElementById('questions-content').classList.add('hidden');
     
-    // Calcular subida/bajada de nivel
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+    const wordsRead = currentStory ? currentStory.split(' ').length : 50;
+    
     let newLevel = currentUser.current_level;
-    let newSuccessStreak = currentUser.success_streak;
-    let newFailStreak = currentUser.fail_streak;
+    let newSuccessStreak = currentUser.success_streak || 0;
+    let newFailStreak = currentUser.fail_streak || 0;
     let levelMsg = "Sigue practicando, ¡lo estás haciendo genial!";
 
     if (score >= 4) {
@@ -201,7 +228,7 @@ async function finishSession() {
             newSuccessStreak = 0;
             levelMsg = "¡Felicidades! ¡Has subido de nivel! 🚀";
         }
-    } else if (score <= 1) { // Menos de 2 aciertos
+    } else if (score <= 1) { 
         newFailStreak++;
         newSuccessStreak = 0;
         if (newFailStreak >= 2 && newLevel > 1) {
@@ -210,14 +237,13 @@ async function finishSession() {
             levelMsg = "Vamos a un nivel más fácil para practicar mejor. 💪";
         }
     } else {
-        // Si saca 2 o 3, reseteamos rachas
         newSuccessStreak = 0;
         newFailStreak = 0;
     }
 
-    const newStars = currentUser.total_stars + score;
+    const newStars = (currentUser.total_stars || 0) + score;
 
-    // Actualizar Base de Datos
+    // Guardar sesión en Supabase
     await supabase.from('reading_sessions').insert([{
         profile_id: currentUser.id,
         words_read: wordsRead,
@@ -225,6 +251,7 @@ async function finishSession() {
         score: score
     }]);
 
+    // Actualizar perfil en Supabase
     await supabase.from('profiles').update({
         current_level: newLevel,
         total_stars: newStars,
@@ -232,11 +259,12 @@ async function finishSession() {
         fail_streak: newFailStreak
     }).eq('id', currentUser.id);
 
-    // Actualizar estado local
+    // Actualizar estado local y almacenamiento
     currentUser.current_level = newLevel;
     currentUser.total_stars = newStars;
     currentUser.success_streak = newSuccessStreak;
     currentUser.fail_streak = newFailStreak;
+    localStorage.setItem('lee_conmigo_user', JSON.stringify(currentUser));
 
     // Mostrar UI de Resultados
     document.getElementById('result-score').innerText = `${score}/5`;
@@ -248,4 +276,3 @@ document.getElementById('btn-home').addEventListener('click', () => {
     updateDashboardUi();
     showScreen('dashboard');
 });
-
