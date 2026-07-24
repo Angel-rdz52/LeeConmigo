@@ -273,6 +273,27 @@ function renderQuestion() {
     if (qTitle) qTitle.innerText = `Pregunta ${currentQuestionIndex + 1} de ${currentQuestions.length}`;
     if (qText) qText.innerText = q.pregunta;
     
+    // --- PROGRESIÓN DE VISIBILIDAD DEL TEXTO ---
+    // En Nivel 1 y 2, mostramos el cuento arriba de la pregunta como referencia. En Niveles 3, 4 y 5 se oculta.
+    let storyHelper = document.getElementById('story-helper-box');
+    if (currentUser.current_level <= 2) {
+        if (!storyHelper) {
+            storyHelper = document.createElement('div');
+            storyHelper.id = 'story-helper-box';
+            storyHelper.className = 'p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 max-h-24 overflow-y-auto mb-2';
+            const questionsContainer = document.getElementById('screen-questions');
+            // Insertamos el recordatorio del cuento antes de las opciones
+            questionsContainer.insertBefore(storyHelper, document.getElementById('options-container'));
+        }
+        storyHelper.innerText = `📖 Cuento: "${currentStory}"`;
+        storyHelper.classList.remove('hidden');
+    } else {
+        if (storyHelper) {
+            storyHelper.classList.add('hidden');
+        }
+    }
+    // -------------------------------------------
+
     const container = document.getElementById('options-container');
     if (!container) return;
     
